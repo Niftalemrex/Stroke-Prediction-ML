@@ -1,0 +1,26 @@
+{
+  "low_risk_patient": {
+    "age": 35,
+    "bmi": 22.5,
+    "hypertension": 0,
+    "diabetes": 0,
+    "smoking": 0,
+    "cholesterol": 180
+  },
+  "moderate_risk_patient": {
+    "age": 55,
+    "bmi": 28.5,
+    "hypertension": 1,
+    "diabetes": 0,
+    "smoking": 1,
+    "cholesterol": 220
+  },
+  "high_risk_patient": {
+    "age": 68,
+    "bmi": 32.0,
+    "hypertension": 1,
+    "diabetes": 1,
+    "smoking": 1,
+    "cholesterol": 280
+  }
+}
