@@ -1,0 +1,8 @@
+name = "stroke-pred-api"
+main = "ml_api_stroke.py"
+compatibility_date = "2025-03-14"name = "stroke-pred-api"
+main = "ml_api_stroke.py"
+compatibility_date = "2025-03-14"
+
+[vars]
+# No environment variables needed for the backend itself
