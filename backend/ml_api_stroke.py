@@ -24,14 +24,16 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow ALL origins
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicitly list methods
-    allow_headers=["*"],  # Allow all headers
-    expose_headers=["*"],  # Expose all headers
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Load model and features
 try:
     model = joblib.load("stroke_model.pkl")
+    # Fix potential deadlock by forcing single-threaded prediction
+    model.n_jobs = 1
     features = joblib.load("model_features.pkl")
     logger.info("✅ Model loaded successfully")
     logger.info(f"📊 Model features: {features}")
@@ -75,7 +77,6 @@ async def health_check():
 # Handle OPTIONS requests for CORS preflight
 @app.options("/predict_stroke")
 async def options_predict_stroke():
-    """Handle OPTIONS request for CORS preflight"""
     return {
         "message": "CORS preflight successful",
         "allowed_methods": ["POST", "OPTIONS"],
@@ -85,7 +86,6 @@ async def options_predict_stroke():
 
 @app.options("/predict")
 async def options_predict():
-    """Handle OPTIONS request for CORS preflight"""
     return {
         "message": "CORS preflight successful",
         "allowed_methods": ["POST", "OPTIONS"],
@@ -102,11 +102,13 @@ async def predict_stroke_legacy(request: StrokePredictionRequest):
     return await predict_stroke_endpoint(request)
 
 async def predict_stroke_endpoint(request: StrokePredictionRequest):
+    logger.info("📥 Received prediction request")
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
     try:
         # Calculate BMI if height and weight are provided
+        logger.info("Step 1: BMI calculation")
         bmi = request.bmi
         if bmi is None and request.height is not None and request.weight is not None:
             if request.height > 0:
@@ -119,6 +121,7 @@ async def predict_stroke_endpoint(request: StrokePredictionRequest):
             raise HTTPException(status_code=400, detail="BMI must be provided or calculated from height/weight")
         
         # Validate inputs
+        logger.info("Step 2: Input validation")
         if request.age < 18 or request.age > 120:
             raise HTTPException(status_code=400, detail="Age must be between 18 and 120")
         
@@ -132,11 +135,15 @@ async def predict_stroke_endpoint(request: StrokePredictionRequest):
             raise HTTPException(status_code=400, detail="Medical conditions must be 0 or 1")
         
         # Prepare features in correct order
+        logger.info("Step 3: Preparing features")
         input_features = [request.age, bmi, request.hypertension, 
                          request.diabetes, request.smoking, request.cholesterol]
+        logger.info(f"Features: {input_features}")
         
         # Make prediction
+        logger.info("Step 4: Calling model.predict_proba()")
         probability = model.predict_proba([input_features])[0][1]
+        logger.info(f"Prediction probability: {probability}")
         
         # Determine risk level
         if probability >= 0.7:
@@ -196,6 +203,7 @@ async def predict_stroke_endpoint(request: StrokePredictionRequest):
         if request.cholesterol > 240:
             factors.append("High Cholesterol (>240 mg/dL)")
         
+        logger.info("Step 5: Building response")
         return {
             "success": True,
             "stroke_risk_probability": float(probability),
@@ -218,7 +226,7 @@ async def predict_stroke_endpoint(request: StrokePredictionRequest):
         }
         
     except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
+        logger.error(f"❌ Prediction error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 # Simple test endpoint for quick verification
